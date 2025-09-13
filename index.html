@@ -3,6 +3,92 @@
 <head>
   <meta charset="UTF-8">
   <title>Webhook Spammer</title>
+  <style>
+    body {
+      background-color: #1e1e1e;
+      color: #00ff99;
+      font-family: "Courier New", monospace;
+      padding: 15px;
+      margin: 0;
+    }
+
+    h1, h2 {
+      text-align: center;
+      margin-bottom: 15px;
+    }
+
+    form {
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    fieldset {
+      border: 1px solid #00ff99;
+      margin-bottom: 15px;
+      padding: 12px;
+      border-radius: 8px;
+    }
+
+    legend {
+      color: #00ff99;
+      font-weight: bold;
+    }
+
+    input, textarea, select {
+      background: #2b2b2b;
+      color: #00ff99;
+      border: 1px solid #00ff99;
+      padding: 12px;
+      width: 100%;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+
+    button {
+      background: #2b2b2b;
+      color: #00ff99;
+      border: 1px solid #00ff99;
+      padding: 14px;
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 16px;
+      margin-bottom: 10px;
+      width: 100%;
+    }
+
+    button:hover {
+      box-shadow: 0 0 8px #00ff99;
+    }
+
+    #log {
+      background: #111;
+      border: 1px solid #00ff99;
+      padding: 12px;
+      max-height: 250px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-size: 14px;
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 500px) {
+      input, textarea, select {
+        font-size: 18px;
+        padding: 14px;
+      }
+      button {
+        font-size: 18px;
+        padding: 16px;
+      }
+      #log {
+        font-size: 16px;
+        max-height: 300px;
+      }
+    }
+  </style>
 </head>
 <body>
   <h1>Webhook Spammer</h1>
@@ -27,5 +113,103 @@
 
   <h2>ログ</h2>
   <div id="log"></div>
+
+  <script>
+    let stopSpam = false;
+
+    function log(msg){
+      const logEl = document.getElementById("log");
+      logEl.textContent += `\n${new Date().toLocaleTimeString()} - ${msg}`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    async function spamWebhook(url, message, count, interval){
+      for(let i=0;i<count;i++){
+        if(stopSpam) break;
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({content: message})
+          });
+          if(res.status === 429){
+            const data = await res.json();
+            log(`⏳ レート制限: ${data.retry_after}s`);
+            await new Promise(r=>setTimeout(r,data.retry_after*1000));
+            i--; // 同じ回を再送
+          } else if(res.ok){
+            log(`✅ 送信成功 (${i+1}/${count})`);
+          } else {
+            log(`❌ 送信失敗: status ${res.status}`);
+            break;
+          }
+        } catch(e){
+          log(`❌ 送信エラー: ${e.message}`);
+        }
+        await new Promise(r=>setTimeout(r, interval));
+      }
+    }
+
+    async function createWebhook(token, channelId, webhookName, message, count, interval){
+      const headers = {Authorization: token, 'Content-Type':'application/json'};
+      try{
+        const res = await fetch(`https://discord.com/api/v9/channels/${channelId}/webhooks`,{headers});
+        const webhooks = await res.json();
+        let existing = webhooks.find(w=>w.name===webhookName);
+
+        if(existing){
+          log(`🔄 既存Webhook検出: ${existing.url}`);
+          spamWebhook(existing.url, message, count, interval);
+          return;
+        }
+
+        const createRes = await fetch(`https://discord.com/api/v9/channels/${channelId}/webhooks`,{
+          method:'POST',
+          headers,
+          body: JSON.stringify({name:webhookName})
+        });
+        const newWebhook = await createRes.json();
+        log(`🚀 Webhook作成: ${newWebhook.url}`);
+        spamWebhook(newWebhook.url, message, count, interval);
+      } catch(e){
+        log(`❌ Webhook作成失敗: ${e.message}`);
+      }
+    }
+
+    async function main(token, guildId, webhookName, message, count, interval){
+      stopSpam = false;
+      log("🔄 チャンネル取得中...");
+      try{
+        const res = await fetch(`https://discord.com/api/v9/guilds/${guildId}/channels`, {headers:{Authorization:token}});
+        const channels = (await res.json()).map(c=>c.id);
+        log(`🔀 対象チャネル: ${channels.join(", ")}`);
+        for(const id of channels){
+          if(stopSpam) break;
+          createWebhook(token,id,webhookName,message,count,interval);
+        }
+      } catch(e){
+        log(`❌ チャンネル取得失敗: ${e.message}`);
+      }
+    }
+
+    document.getElementById("form").addEventListener("submit", e=>{
+      e.preventDefault();
+      const token = document.getElementById("token").value.trim();
+      const guildId = document.getElementById("guildId").value.trim();
+      const webhookName = document.getElementById("webhookName").value.trim();
+      const message = document.getElementById("message").value.trim();
+      const count = parseInt(document.getElementById("count").value);
+      const interval = parseInt(document.getElementById("interval").value);
+
+      document.querySelector("button[type=submit]").disabled=true;
+      main(token,guildId,webhookName,message,count,interval);
+    });
+
+    document.getElementById("stop").addEventListener("click", ()=>{
+      stopSpam=true;
+      log("🛑 停止しました");
+      document.querySelector("button[type=submit]").disabled=false;
+    });
+  </script>
 </body>
 </html>
