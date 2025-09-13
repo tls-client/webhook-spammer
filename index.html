@@ -4,109 +4,108 @@
   <meta charset="UTF-8">
   <title>Webhook Spammer</title>
   <style>
-    body {
-      background-color: #1e1e1e;
-      color: #00ff99;
-      font-family: "Courier New", monospace;
-      padding: 15px;
-      margin: 0;
-    }
+    /* 全体 */
+body {
+  background-color: #121212;
+  color: #00ff99;
+  font-family: "Courier New", monospace;
+  padding: 10px;
+  margin: 0;
+  font-size: 16px;
+}
 
-    h1, h2 {
-      text-align: center;
-      margin-bottom: 15px;
-    }
+/* フォームフィールド */
+fieldset {
+  border: 1px solid #00ff99;
+  margin-bottom: 15px;
+  padding: 12px;
+  border-radius: 8px;
+}
 
-    form {
-      max-width: 480px;
-      margin: 0 auto;
-    }
+legend {
+  color: #00ff99;
+  font-weight: bold;
+  font-size: 18px;
+}
 
-    fieldset {
-      border: 1px solid #00ff99;
-      margin-bottom: 15px;
-      padding: 12px;
-      border-radius: 8px;
-    }
+/* 入力欄 */
+input, textarea, select {
+  background: #1a1a1a;
+  color: #00ff99;
+  border: 1px solid #00ff99;
+  padding: 12px;
+  width: 100%;
+  margin-bottom: 12px;
+  font-size: 16px;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
 
-    legend {
-      color: #00ff99;
-      font-weight: bold;
-    }
+/* ボタン */
+button {
+  background: #1a1a1a;
+  color: #00ff99;
+  border: 1px solid #00ff99;
+  padding: 14px;
+  width: 100%;
+  margin-bottom: 12px;
+  cursor: pointer;
+  font-size: 18px;
+  border-radius: 6px;
+  transition: 0.2s;
+}
 
-    input, textarea, select {
-      background: #2b2b2b;
-      color: #00ff99;
-      border: 1px solid #00ff99;
-      padding: 12px;
-      width: 100%;
-      margin-bottom: 10px;
-      border-radius: 6px;
-      font-size: 16px;
-      box-sizing: border-box;
-    }
+button:hover {
+  box-shadow: 0 0 12px #00ff99;
+}
 
-    button {
-      background: #2b2b2b;
-      color: #00ff99;
-      border: 1px solid #00ff99;
-      padding: 14px;
-      cursor: pointer;
-      border-radius: 6px;
-      font-size: 16px;
-      margin-bottom: 10px;
-      width: 100%;
-    }
+/* ログ */
+#log {
+  background: #000;
+  border: 1px solid #00ff99;
+  padding: 10px;
+  height: 250px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-size: 14px;
+  border-radius: 6px;
+}
 
-    button:hover {
-      box-shadow: 0 0 8px #00ff99;
-    }
-
-    #log {
-      background: #111;
-      border: 1px solid #00ff99;
-      padding: 12px;
-      max-height: 250px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      font-size: 14px;
-      border-radius: 6px;
-      margin-top: 10px;
-    }
-
-    @media (max-width: 500px) {
-      input, textarea, select {
-        font-size: 18px;
-        padding: 14px;
-      }
-      button {
-        font-size: 18px;
-        padding: 16px;
-      }
-      #log {
-        font-size: 16px;
-        max-height: 300px;
-      }
-    }
+/* メディアクエリ: スマホ用調整 */
+@media (max-width: 480px) {
+  body {
+    padding: 8px;
+    font-size: 15px;
+  }
+  legend {
+    font-size: 16px;
+  }
+  input, textarea, select {
+    padding: 14px;
+    font-size: 16px;
+  }
+  button {
+    padding: 16px;
+    font-size: 18px;
+  }
+  #log {
+    height: 200px;
+    font-size: 14px;
+  }
+}
   </style>
 </head>
 <body>
   <h1>Webhook Spammer</h1>
   <form id="form">
     <fieldset>
-      <legend>接続情報</legend>
       <input type="text" id="token" placeholder="Bot Token" required>
       <input type="text" id="guildId" placeholder="サーバーID" required>
       <input type="text" id="webhookName" placeholder="Webhook名" required>
-    </fieldset>
-
-    <fieldset>
-      <legend>メッセージ設定</legend>
       <textarea id="message" rows="3" placeholder="送信するメッセージ" required></textarea>
       <label>送信回数: <input type="number" id="count" min="1" value="1"></label>
       <label>送信間隔(ms): <input type="number" id="interval" min="100" value="1000"></label>
     </fieldset>
-
     <button type="submit">開始</button>
     <button type="button" id="stop">停止</button>
   </form>
